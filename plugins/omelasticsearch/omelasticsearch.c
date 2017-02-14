@@ -99,6 +99,7 @@ typedef struct _instanceData {
 	uchar *tplName;
 	uchar *timeout;
 	uchar *bulkId;
+	uchar *confParam;
 	uchar *errorFile;
 	sbool errorOnly;
 	sbool interleaved;
@@ -146,8 +147,9 @@ static struct cnfparamdescr actpdescr[] = {
 	{ "bulkmode", eCmdHdlrBinary, 0 },
 	{ "maxbytes", eCmdHdlrSize, 0 },
 	{ "asyncrepl", eCmdHdlrGoneAway, 0 },
-        { "usehttps", eCmdHdlrBinary, 0 },
+	{ "usehttps", eCmdHdlrBinary, 0 },
 	{ "timeout", eCmdHdlrGetWord, 0 },
+	{ "confparam", eCmdHdlrGetWord, 0 },
 	{ "errorfile", eCmdHdlrGetWord, 0 },
 	{ "erroronly", eCmdHdlrBinary, 0 },
 	{ "interleaved", eCmdHdlrBinary, 0 },
@@ -214,6 +216,7 @@ CODESTARTfreeInstance
 	free(pData->parent);
 	free(pData->tplName);
 	free(pData->timeout);
+	free(pData->confParam);
 	free(pData->errorFile);
 	free(pData->bulkId);
 ENDfreeInstance
@@ -257,6 +260,7 @@ CODESTARTdbgPrintInstInfo
 	dbgprintf("\tsearch index='%s'\n", pData->searchType);
 	dbgprintf("\tparent='%s'\n", pData->parent);
 	dbgprintf("\ttimeout='%s'\n", pData->timeout);
+	dbgprintf("\tconfiguration parameters='%s'\n", pData->confParam);
 	dbgprintf("\tdynamic search index=%d\n", pData->dynSrchIdx);
 	dbgprintf("\tdynamic search type=%d\n", pData->dynSrchType);
 	dbgprintf("\tdynamic parent=%d\n", pData->dynParent);
@@ -519,7 +523,12 @@ setPostURL(wrkrInstanceData_t *pWrkrData, instanceData *pData, uchar **tpls)
 	if(parent != NULL) {
 		if(r == 0) r = es_addChar(&url, separator);
 		if(r == 0) r = es_addBuf(&url, "parent=", sizeof("parent=")-1);
-		if(r == 0) es_addBuf(&url, (char*)parent, ustrlen(parent));
+		if(r == 0) r = es_addBuf(&url, (char*)parent, ustrlen(parent));
+	}
+
+	if(pData->confParam != NULL) {
+		if(r == 0) r = es_addChar(&url, separator);
+		if(r == 0) es_addBuf(&url, (char*)pData->confParam, ustrlen(pData->confParam));
 	}
 
 	if(pWrkrData->restURL != NULL)
@@ -576,6 +585,7 @@ buildBatch(wrkrInstanceData_t *pWrkrData, uchar *message, uchar **tpls)
 	uchar *searchType;
 	uchar *parent = NULL;
 	uchar *bulkId = NULL;
+	uchar *confParam = NULL;
 	DEFiRet;
 
 	getIndexTypeAndParent(pWrkrData->pData, tpls, &searchIndex, &searchType, &parent, &bulkId);
@@ -1363,6 +1373,7 @@ setInstParamDefaults(instanceData *pData)
 	pData->searchType = NULL;
 	pData->parent = NULL;
 	pData->timeout = NULL;
+	pData->confParam = NULL;
 	pData->dynSrchIdx = 0;
 	pData->dynSrchType = 0;
 	pData->dynParent = 0;
@@ -1431,6 +1442,8 @@ CODESTARTnewActInst
 			pData->allowUnsignedCerts = pvals[i].val.d.n;
 		} else if(!strcmp(actpblk.descr[i].name, "timeout")) {
 			pData->timeout = (uchar*)es_str2cstr(pvals[i].val.d.estr, NULL);
+		} else if(!strcmp(actpblk.descr[i].name, "confparam")) {
+			pData->confParam = (uchar*)es_str2cstr(pvals[i].val.d.estr, NULL);
 		} else if(!strcmp(actpblk.descr[i].name, "usehttps")) {
 			pData->useHttps = pvals[i].val.d.n;
 		} else if(!strcmp(actpblk.descr[i].name, "template")) {
